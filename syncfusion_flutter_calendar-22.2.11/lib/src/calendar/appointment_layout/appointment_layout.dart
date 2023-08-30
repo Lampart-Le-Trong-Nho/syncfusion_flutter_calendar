@@ -526,7 +526,7 @@ class _AppointmentLayoutState extends State<AppointmentLayout> {
     /// rendering padding and size.
     /// Cell padding value includes month cell text top padding(5) and circle
     /// top(4) and bottom(4) padding
-    const double cellPadding = 13;
+    const double cellPadding = 0;
 
     /// Today circle radius as circle radius added after the text height.
     const double todayCircleRadius = 5;
