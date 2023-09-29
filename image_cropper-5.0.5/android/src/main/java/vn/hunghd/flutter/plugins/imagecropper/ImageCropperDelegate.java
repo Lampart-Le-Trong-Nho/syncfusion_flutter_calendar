@@ -189,9 +189,6 @@ public class ImageCropperDelegate implements PluginRegistry.ActivityResultListen
         if (backgroundColor != null) {
             options.setRootViewBackgroundColor(backgroundColor);
         }
-        if (activeControlsWidgetColor != null) {
-            options.setActiveControlsWidgetColor(activeControlsWidgetColor);
-        }
         if (dimmedLayerColor != null) {
             options.setDimmedLayerColor(dimmedLayerColor);
         }
@@ -222,6 +219,8 @@ public class ImageCropperDelegate implements PluginRegistry.ActivityResultListen
         if (hideBottomControls != null) {
             options.setHideBottomControls(hideBottomControls);
         }
+
+        options.setShowCropFrame(false);
 
         return options;
     }
