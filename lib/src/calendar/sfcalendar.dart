@@ -219,6 +219,7 @@ class SfCalendar extends StatefulWidget {
     this.onDragStart,
     this.onDragUpdate,
     this.onDragEnd,
+    this.onScaleCalendarDay,
   })  : assert(firstDayOfWeek >= 1 && firstDayOfWeek <= 7),
         assert(headerHeight >= 0),
         assert(viewHeaderHeight >= -1),
@@ -1805,6 +1806,8 @@ class SfCalendar extends StatefulWidget {
   ///
   /// ```
   final CalendarSelectionChangedCallback? onSelectionChanged;
+
+  final Function(double scale)? onScaleCalendarDay;
 
   /// Used to set the [Appointment] or custom event collection through the
   /// [CalendarDataSource] class.
