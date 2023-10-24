@@ -655,8 +655,8 @@ class _CustomCalendarScrollViewState extends State<CustomCalendarScrollView>
             },
       onScaleStart: (widget.view == CalendarView.day)
           ? ((ScaleStartDetails details) {
-        _baseScaleFactor = _scaleFactor;
-      })
+              _baseScaleFactor = _scaleFactor;
+            })
           : null,
       onScaleUpdate: (widget.view == CalendarView.day)
           ? (ScaleUpdateDetails details) {
@@ -666,11 +666,11 @@ class _CustomCalendarScrollViewState extends State<CustomCalendarScrollView>
 
               double tempScale = _baseScaleFactor * details.scale;
 
-              if(tempScale < 1) {
+              if (tempScale < 1) {
                 return;
               }
 
-              if(tempScale > 3) {
+              if (tempScale > 3) {
                 return;
               }
 
@@ -696,7 +696,7 @@ class _CustomCalendarScrollViewState extends State<CustomCalendarScrollView>
           }
         },
         child: CustomScrollViewerLayout(
-            _addViews(),
+            _addViews(dragSelectionHandle: _handleSelectionDrag),
             isHorizontalNavigation
                 ? CustomScrollDirection.horizontal
                 : CustomScrollDirection.vertical,
@@ -837,6 +837,12 @@ class _CustomCalendarScrollViewState extends State<CustomCalendarScrollView>
     _animation.removeListener(animationListener);
     _focusNode.dispose();
     super.dispose();
+  }
+
+  void _handleSelectionDrag(bool value) {
+    setState(() {
+      canScroll = value;
+    });
   }
 
   void _handleAppointmentDragStart(
@@ -2987,7 +2993,7 @@ class _CustomCalendarScrollViewState extends State<CustomCalendarScrollView>
     return visibleMonthDates;
   }
 
-  List<Widget> _addViews() {
+  List<Widget> _addViews({Function? dragSelectionHandle}) {
     if (widget.view == CalendarView.day) {
       _children.clear();
     }
@@ -3026,6 +3032,7 @@ class _CustomCalendarScrollViewState extends State<CustomCalendarScrollView>
           _getCalendarViewStateDetails(details);
         },
         canScroll,
+        dragSelectionHandle: dragSelectionHandle,
         key: _previousViewKey,
       );
       _currentView = _CalendarView(
@@ -3060,6 +3067,7 @@ class _CustomCalendarScrollViewState extends State<CustomCalendarScrollView>
           _getCalendarViewStateDetails(details);
         },
         canScroll,
+        dragSelectionHandle: dragSelectionHandle,
         key: _currentViewKey,
       );
       _nextView = _CalendarView(
@@ -3095,6 +3103,7 @@ class _CustomCalendarScrollViewState extends State<CustomCalendarScrollView>
           _getCalendarViewStateDetails(details);
         },
         canScroll,
+        dragSelectionHandle: dragSelectionHandle,
         key: _nextViewKey,
       );
 
@@ -5581,35 +5590,36 @@ class _CustomCalendarScrollViewState extends State<CustomCalendarScrollView>
 @immutable
 class _CalendarView extends StatefulWidget {
   const _CalendarView(
-      this.calendar,
-      this.view,
-      this.visibleDates,
-      this.width,
-      this.height,
-      this.agendaSelectedDate,
-      this.locale,
-      this.calendarTheme,
-      this.themeData,
-      this.regions,
-      this.blackoutDates,
-      this.focusNode,
-      this.removePicker,
-      this.allowViewNavigation,
-      this.controller,
-      this.resourcePanelScrollController,
-      this.resourceCollection,
-      this.textScaleFactor,
-      this.isMobilePlatform,
-      this.minDate,
-      this.maxDate,
-      this.localizations,
-      this.timelineMonthWeekNumberNotifier,
-      this.dragDetails,
-      this.updateCalendarState,
-      this.getCalendarState,
-      this.canScroll,
-      {Key? key})
-      : super(key: key);
+    this.calendar,
+    this.view,
+    this.visibleDates,
+    this.width,
+    this.height,
+    this.agendaSelectedDate,
+    this.locale,
+    this.calendarTheme,
+    this.themeData,
+    this.regions,
+    this.blackoutDates,
+    this.focusNode,
+    this.removePicker,
+    this.allowViewNavigation,
+    this.controller,
+    this.resourcePanelScrollController,
+    this.resourceCollection,
+    this.textScaleFactor,
+    this.isMobilePlatform,
+    this.minDate,
+    this.maxDate,
+    this.localizations,
+    this.timelineMonthWeekNumberNotifier,
+    this.dragDetails,
+    this.updateCalendarState,
+    this.getCalendarState,
+    this.canScroll, {
+    Key? key,
+    this.dragSelectionHandle,
+  }) : super(key: key);
 
   final List<DateTime> visibleDates;
   final List<CalendarTimeRegion>? regions;
@@ -5638,6 +5648,7 @@ class _CalendarView extends StatefulWidget {
   final SfLocalizations localizations;
   final ValueNotifier<DragPaintDetails> dragDetails;
   final bool canScroll;
+  final Function? dragSelectionHandle;
 
   @override
   _CalendarViewState createState() => _CalendarViewState();
@@ -5709,6 +5720,7 @@ class _CalendarViewState extends State<_CalendarView>
 
   late ValueNotifier<ResizingPaintDetails> _resizingDetails;
   double? _maximumResizingPosition;
+  Offset? _calendarDayTapPosition;
 
   @override
   void initState() {
@@ -8675,9 +8687,21 @@ class _CalendarViewState extends State<_CalendarView>
                       RepaintBoundary(
                         child: CustomPaint(
                           painter: _addSelectionView(),
-                          size: Size(width, height),
                         ),
                       ),
+                      if (isCurrentView)
+                        DraggingSelectionWidget(
+                          calendar: widget.calendar,
+                          timeSlotViewSettings:
+                              widget.calendar.timeSlotViewSettings,
+                          timeLabelWidth: timeLabelWidth,
+                          width: width,
+                          height: height,
+                          cellHeight: _timeIntervalHeight,
+                          position: _calendarDayTapPosition,
+                          dragSelectionHandle: widget.dragSelectionHandle,
+                          scrollController: _scrollController,
+                        ),
                       _getCurrentTimeIndicator(
                           timeLabelWidth, width, height, false),
                     ])

@@ -78,6 +78,17 @@ class CalendarSelectionDetails {
   final CalendarResource? resource;
 }
 
+@immutable
+class CalendarDaySelectionDetails {
+  /// Creates details for [CalendarSelectionChangedCallback].
+  const CalendarDaySelectionDetails(this.startDate, this.endDate);
+
+  /// The date time value that represents selected calendar cell on
+  /// timeslot and month views.
+  final DateTime? startDate;
+  final DateTime? endDate;
+}
+
 /// The element that tapped or long pressed on view in [SfCalendar].
 ///
 /// Base class for [CalendarTapDetails] and [CalendarLongPressDetails].

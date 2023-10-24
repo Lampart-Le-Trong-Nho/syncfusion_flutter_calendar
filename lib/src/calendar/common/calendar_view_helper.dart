@@ -515,6 +515,12 @@ class CalendarViewHelper {
     calendar.onSelectionChanged!(CalendarSelectionDetails(date, resource));
   }
 
+  static void raiseCalendarDaySelectionChangedCallback(
+      SfCalendar calendar, DateTime? startDate, DateTime? endDate) {
+    calendar.onDaySelectionChanged!(
+        CalendarDaySelectionDetails(startDate, endDate));
+  }
+
   /// method that raises the visible dates changed callback with the given
   /// parameters
   static void raiseViewChangedCallback(
