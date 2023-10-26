@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:syncfusion_flutter_calendar/src/calendar/appointment_engine/appointment_helper.dart';
 import 'package:syncfusion_flutter_calendar/src/calendar/common/calendar_view_helper.dart';
 import 'package:syncfusion_flutter_calendar/src/calendar/settings/time_slot_view_settings.dart';
 import 'package:syncfusion_flutter_calendar/src/calendar/sfcalendar.dart';
@@ -10,24 +11,22 @@ class DraggingSelectionWidget extends StatefulWidget {
     required this.cellHeight,
     required this.width,
     required this.height,
-    Offset? position,
     this.dragSelectionHandle,
     this.scrollController,
     required this.timeSlotViewSettings,
     required this.calendar,
-  }) {
-    this.position = position ?? Offset(0, 0);
-  }
+    required this.initDateTime,
+  });
 
   final SfCalendar calendar;
   final double timeLabelWidth;
   final double cellHeight;
   final double width;
   final double height;
-  late Offset position;
   final Function? dragSelectionHandle;
   final ScrollController? scrollController;
   final TimeSlotViewSettings timeSlotViewSettings;
+  final DateTime initDateTime;
 
   @override
   _DraggingSelectionState createState() => _DraggingSelectionState();
@@ -39,6 +38,7 @@ class _DraggingSelectionState extends State<DraggingSelectionWidget> {
   Offset? _position;
   bool showTimeStart = false;
   bool showTimeEnd = false;
+  DateTime? today;
   DateTime? start;
   DateTime? end;
   final DateFormat formatterTime = DateFormat.Hm();
@@ -47,17 +47,43 @@ class _DraggingSelectionState extends State<DraggingSelectionWidget> {
   @override
   void initState() {
     super.initState();
-    _position = widget.position;
+    today = DateTime(widget.initDateTime.year, widget.initDateTime.month,
+        widget.initDateTime.day);
     _selectionHeight = widget.cellHeight;
-    start =
-        _getDateFromPositionSelection(widget.cellHeight, widget.position.dy);
-    end = _getDateFromPositionSelection(
-        widget.cellHeight, widget.position.dy + _selectionHeight);
+    _initPosition();
+  }
+
+  @override
+  void didUpdateWidget(covariant DraggingSelectionWidget oldWidget) {
+    if (widget.initDateTime != oldWidget.initDateTime) {
+      _initPosition();
+    }
+    super.didUpdateWidget(oldWidget);
   }
 
   @override
   void dispose() {
     super.dispose();
+  }
+
+  void _initPosition() {
+    double yPosition = AppointmentHelper.timeToPosition(
+        widget.calendar, widget.initDateTime, widget.cellHeight);
+
+    if (yPosition + _selectionHeight > widget.height) {
+      yPosition = widget.height - _selectionHeight;
+    }
+
+    final Offset position = Offset(0, yPosition);
+    _position = position;
+    start = widget.initDateTime;
+    end = today?.add(_getDurationFromPositionSelection(
+        widget.cellHeight, position.dy + _selectionHeight));
+    Future.delayed(
+      const Duration(milliseconds: 500),
+          () => CalendarViewHelper.raiseCalendarDaySelectionChangedCallback(
+          widget.calendar, start, end),
+    );
   }
 
   @override
@@ -84,9 +110,10 @@ class _DraggingSelectionState extends State<DraggingSelectionWidget> {
             dy = widget.height - _selectionHeight;
           }
 
-          start = _getDateFromPositionSelection(widget.cellHeight, dy);
-          end = _getDateFromPositionSelection(
-              widget.cellHeight, dy + _selectionHeight);
+          start = today
+              ?.add(_getDurationFromPositionSelection(widget.cellHeight, dy));
+          end = today?.add(_getDurationFromPositionSelection(
+              widget.cellHeight, dy + _selectionHeight));
 
           setState(() {
             _position = Offset(_position!.dx, dy);
@@ -162,8 +189,8 @@ class _DraggingSelectionState extends State<DraggingSelectionWidget> {
                     updateHeight = widget.height;
                   }
 
-                  end = _getDateFromPositionSelection(
-                      widget.cellHeight, _position!.dy + updateHeight);
+                  end = today?.add(_getDurationFromPositionSelection(
+                      widget.cellHeight, _position!.dy + updateHeight));
 
                   setState(() {
                     _selectionHeight = updateHeight;
@@ -174,7 +201,7 @@ class _DraggingSelectionState extends State<DraggingSelectionWidget> {
                   CalendarViewHelper.raiseCalendarDaySelectionChangedCallback(
                       widget.calendar, start, end);
                 },
-                child: Container(
+                child: SizedBox(
                   width: paddingBottom * 2,
                   height: paddingBottom * 2,
                   child: Center(
@@ -195,11 +222,7 @@ class _DraggingSelectionState extends State<DraggingSelectionWidget> {
     );
   }
 
-  DateTime? _getDateFromPositionSelection(double cellHeight, double y) {
-    final double time = y / cellHeight;
-    final int hour = time.truncate();
-    final int minute = ((time - hour) * 60).round();
-
-    return DateTime(0, 1, 1, hour, minute);
+  Duration _getDurationFromPositionSelection(double cellHeight, double y) {
+    return Duration(milliseconds: (y / cellHeight * 3600000).toInt());
   }
 }

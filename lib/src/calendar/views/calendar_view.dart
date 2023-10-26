@@ -5720,7 +5720,7 @@ class _CalendarViewState extends State<_CalendarView>
 
   late ValueNotifier<ResizingPaintDetails> _resizingDetails;
   double? _maximumResizingPosition;
-  Offset? _calendarDayTapPosition;
+  DateTime? _calendarDaySelectDate;
 
   @override
   void initState() {
@@ -8689,7 +8689,7 @@ class _CalendarViewState extends State<_CalendarView>
                           painter: _addSelectionView(),
                         ),
                       ),
-                      if (isCurrentView)
+                      if (isCurrentView && _calendarDaySelectDate != null)
                         DraggingSelectionWidget(
                           calendar: widget.calendar,
                           timeSlotViewSettings:
@@ -8698,7 +8698,7 @@ class _CalendarViewState extends State<_CalendarView>
                           width: width,
                           height: height,
                           cellHeight: _timeIntervalHeight,
-                          position: _calendarDayTapPosition,
+                          initDateTime: _calendarDaySelectDate!,
                           dragSelectionHandle: widget.dragSelectionHandle,
                           scrollController: _scrollController,
                         ),
@@ -9995,6 +9995,7 @@ class _CalendarViewState extends State<_CalendarView>
         }
 
         if (canRaiseTap) {
+          _calendarDaySelectDate = _selectionPainter!.selectedDate;
           CalendarViewHelper.raiseCalendarTapCallback(
               widget.calendar,
               _selectionPainter!.selectedDate,
