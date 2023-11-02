@@ -674,7 +674,7 @@ class _CustomCalendarScrollViewState extends State<CustomCalendarScrollView>
                 return;
               }
 
-              _scaleFactor = _baseScaleFactor * details.scale;
+              _scaleFactor = tempScale;
               widget.calendar.onScaleCalendarDay?.call(_scaleFactor);
             }
           : null,
@@ -5146,6 +5146,9 @@ class _CustomCalendarScrollViewState extends State<CustomCalendarScrollView>
           }
           // fling the view from right to left
           else if (-dragEndDetails.velocity.pixelsPerSecond.dx > widget.width) {
+            if (widget.view == CalendarView.day) {
+              _getCurrentViewByVisibleDates()!.reloadCalendarDaySelectionDate();
+            }
             if (!DateTimeHelper.canMoveToNextView(
                 widget.view,
                 widget.calendar.monthViewSettings.numberOfWeeksInView,
@@ -5182,6 +5185,9 @@ class _CustomCalendarScrollViewState extends State<CustomCalendarScrollView>
           }
           // condition to check and update the left to right swiping
           else if (_position >= widget.width / 2) {
+            if (widget.view == CalendarView.day) {
+              _getCurrentViewByVisibleDates()!.reloadCalendarDaySelectionDate();
+            }
             _tween.begin = _position;
             _tween.end = widget.width;
 
@@ -5201,6 +5207,9 @@ class _CustomCalendarScrollViewState extends State<CustomCalendarScrollView>
           }
           // fling the view from left to right
           else if (dragEndDetails.velocity.pixelsPerSecond.dx > widget.width) {
+            if (widget.view == CalendarView.day) {
+              _getCurrentViewByVisibleDates()!.reloadCalendarDaySelectionDate();
+            }
             if (!DateTimeHelper.canMoveToPreviousView(
                 widget.view,
                 widget.calendar.monthViewSettings.numberOfWeeksInView,
@@ -10057,6 +10066,10 @@ class _CalendarViewState extends State<_CalendarView>
     }
 
     return selectedAppointmentView;
+  }
+
+  reloadCalendarDaySelectionDate() {
+    _calendarDaySelectDate = null;
   }
 
   /// Check the selected date region as enabled time region or not.

@@ -33,7 +33,7 @@ class DraggingSelectionWidget extends StatefulWidget {
 }
 
 class _DraggingSelectionState extends State<DraggingSelectionWidget> {
-  final double paddingBottom = 15;
+  final double paddingBottom = 25;
   final double dragDotsSize = 10;
   Offset? _position;
   bool showTimeStart = false;
@@ -43,10 +43,14 @@ class _DraggingSelectionState extends State<DraggingSelectionWidget> {
   DateTime? end;
   final DateFormat formatterTime = DateFormat.Hm();
   double _selectionHeight = 0.0;
+  double _minHeight = 0;
+  bool _changeSize = false;
+  double _heightScaleTemp = 0.0;
 
   @override
   void initState() {
     super.initState();
+    _minHeight = widget.cellHeight / 4;
     today = DateTime(widget.initDateTime.year, widget.initDateTime.month,
         widget.initDateTime.day);
     _selectionHeight = widget.cellHeight;
@@ -55,9 +59,20 @@ class _DraggingSelectionState extends State<DraggingSelectionWidget> {
 
   @override
   void didUpdateWidget(covariant DraggingSelectionWidget oldWidget) {
+    _minHeight = widget.cellHeight / 4;
+
     if (widget.initDateTime != oldWidget.initDateTime) {
       _initPosition();
     }
+
+    if (widget.cellHeight != oldWidget.cellHeight) {
+      _position = Offset(
+          0,
+          _getPositionSelectionFromDateTime(
+              widget.cellHeight, start ?? widget.initDateTime));
+      _selectionHeight *= widget.cellHeight / oldWidget.cellHeight;
+    }
+
     super.didUpdateWidget(oldWidget);
   }
 
@@ -81,7 +96,7 @@ class _DraggingSelectionState extends State<DraggingSelectionWidget> {
         widget.cellHeight, position.dy + _selectionHeight));
     Future.delayed(
       const Duration(milliseconds: 500),
-          () => CalendarViewHelper.raiseCalendarDaySelectionChangedCallback(
+      () => CalendarViewHelper.raiseCalendarDaySelectionChangedCallback(
           widget.calendar, start, end),
     );
   }
@@ -98,66 +113,92 @@ class _DraggingSelectionState extends State<DraggingSelectionWidget> {
         onTapUp: (TapUpDetails details) {
           widget.dragSelectionHandle?.call(true);
         },
-        onPanStart: (DragStartDetails details) {
-          showTimeStart = true;
-        },
-        onPanUpdate: (DragUpdateDetails details) {
-          double dy = _position!.dy + details.delta.dy;
+        onPanStart: _changeSize
+            ? null
+            : (DragStartDetails details) {
+                showTimeStart = true;
+              },
+        onPanUpdate: _changeSize
+            ? null
+            : (DragUpdateDetails details) {
+                _heightScaleTemp += details.delta.dy;
 
-          if (dy < 0) {
-            dy = 0;
-          } else if (dy + _selectionHeight > widget.height) {
-            dy = widget.height - _selectionHeight;
-          }
+                if (_heightScaleTemp.abs() < _minHeight) {
+                  return;
+                }
 
-          start = today
-              ?.add(_getDurationFromPositionSelection(widget.cellHeight, dy));
-          end = today?.add(_getDurationFromPositionSelection(
-              widget.cellHeight, dy + _selectionHeight));
+                double dy = _position!.dy;
 
-          setState(() {
-            _position = Offset(_position!.dx, dy);
-          });
-        },
-        onPanEnd: (DragEndDetails details) {
-          showTimeStart = false;
-          CalendarViewHelper.raiseCalendarDaySelectionChangedCallback(
-              widget.calendar, start, end);
-        },
+                if (_heightScaleTemp > 0) {
+                  dy += _minHeight;
+                } else {
+                  dy -= _minHeight;
+                }
+
+                _heightScaleTemp = 0;
+
+                if (dy < 0) {
+                  dy = 0;
+                } else if (dy + _selectionHeight > widget.height) {
+                  dy = widget.height - _selectionHeight;
+                }
+
+                start = today?.add(
+                    _getDurationFromPositionSelection(widget.cellHeight, dy));
+                end = today?.add(_getDurationFromPositionSelection(
+                    widget.cellHeight, dy + _selectionHeight));
+
+                setState(() {
+                  _position = Offset(_position!.dx, dy);
+                });
+              },
+        onPanEnd: _changeSize
+            ? null
+            : (DragEndDetails details) {
+                _heightScaleTemp = 0;
+                showTimeStart = false;
+                CalendarViewHelper.raiseCalendarDaySelectionChangedCallback(
+                    widget.calendar, start, end);
+                widget.dragSelectionHandle?.call(true);
+              },
         child: Stack(
           children: <Widget>[
             Row(
               children: <Widget>[
-                SizedBox(
-                  width: widget.timeLabelWidth,
-                  height: _selectionHeight,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: <Widget>[
-                      Positioned(
-                        top: 0,
-                        child: Text(
-                          showTimeStart ? formatterTime.format(start!) : '',
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelSmall!
-                              .copyWith(color: Colors.grey),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        child: Text(
-                            showTimeEnd ? formatterTime.format(end!) : '',
+                Padding(
+                  padding: EdgeInsets.only(bottom: paddingBottom),
+                  child: SizedBox(
+                    width: widget.timeLabelWidth,
+                    height: _selectionHeight,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      alignment: Alignment.center,
+                      children: <Widget>[
+                        Positioned(
+                          top: 0,
+                          child: Text(
+                            showTimeStart ? formatterTime.format(start!) : '',
                             textAlign: TextAlign.center,
                             style: Theme.of(context)
                                 .textTheme
                                 .labelSmall!
-                                .copyWith(
-                                  color: Colors.grey,
-                                )),
-                      ),
-                    ],
+                                .copyWith(color: Colors.grey),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          child: Text(
+                              showTimeEnd ? formatterTime.format(end!) : '',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall!
+                                  .copyWith(
+                                    color: Colors.grey,
+                                  )),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 Padding(
@@ -174,17 +215,41 @@ class _DraggingSelectionState extends State<DraggingSelectionWidget> {
               ],
             ),
             Positioned(
-              right: 15,
               bottom: 0,
+              right: 0,
               child: GestureDetector(
+                onTapDown: (TapDownDetails details) {
+                  setState(() {
+                    _changeSize = true;
+                  });
+                },
+                onTapUp: (TapUpDetails details) {
+                  setState(() {
+                    _changeSize = false;
+                  });
+                },
                 onPanStart: (DragStartDetails details) {
                   showTimeEnd = true;
                 },
                 onPanUpdate: (DragUpdateDetails details) {
-                  double updateHeight = _selectionHeight + details.delta.dy;
+                  _heightScaleTemp += details.delta.dy;
 
-                  if (updateHeight <= 20) {
-                    updateHeight = 20;
+                  if (_heightScaleTemp.abs() < _minHeight) {
+                    return;
+                  }
+
+                  double updateHeight = _selectionHeight;
+
+                  if (_heightScaleTemp > 0) {
+                    updateHeight += _minHeight;
+                  } else {
+                    updateHeight -= _minHeight;
+                  }
+
+                  _heightScaleTemp = 0;
+
+                  if (updateHeight <= _minHeight) {
+                    updateHeight = _minHeight;
                   } else if (updateHeight > widget.height) {
                     updateHeight = widget.height;
                   }
@@ -197,9 +262,13 @@ class _DraggingSelectionState extends State<DraggingSelectionWidget> {
                   });
                 },
                 onPanEnd: (DragEndDetails details) {
+                  _heightScaleTemp = 0;
                   showTimeEnd = false;
                   CalendarViewHelper.raiseCalendarDaySelectionChangedCallback(
                       widget.calendar, start, end);
+                  setState(() {
+                    _changeSize = false;
+                  });
                 },
                 child: SizedBox(
                   width: paddingBottom * 2,
@@ -223,6 +292,15 @@ class _DraggingSelectionState extends State<DraggingSelectionWidget> {
   }
 
   Duration _getDurationFromPositionSelection(double cellHeight, double y) {
-    return Duration(milliseconds: (y / cellHeight * 3600000).toInt());
+    return Duration(milliseconds: (y / cellHeight * 3600000).round());
+  }
+
+  double _getPositionSelectionFromDateTime(
+      double cellHeight, DateTime duration) {
+    return duration
+            .difference(DateTime(duration.year, duration.month, duration.day))
+            .inMilliseconds *
+        cellHeight /
+        3600000;
   }
 }
