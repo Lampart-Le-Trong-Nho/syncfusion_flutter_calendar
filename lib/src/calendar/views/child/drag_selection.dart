@@ -44,7 +44,6 @@ class _DraggingSelectionState extends State<DraggingSelectionWidget> {
   final DateFormat formatterTime = DateFormat.Hm();
   double _selectionHeight = 0.0;
   double _minHeight = 0;
-  bool _changeSize = false;
   double _heightScaleTemp = 0.0;
 
   @override
@@ -113,54 +112,48 @@ class _DraggingSelectionState extends State<DraggingSelectionWidget> {
         onTapUp: (TapUpDetails details) {
           widget.dragSelectionHandle?.call(true);
         },
-        onPanStart: _changeSize
-            ? null
-            : (DragStartDetails details) {
-                showTimeStart = true;
-              },
-        onPanUpdate: _changeSize
-            ? null
-            : (DragUpdateDetails details) {
-                _heightScaleTemp += details.delta.dy;
+        onPanStart: (DragStartDetails details) {
+          showTimeStart = true;
+        },
+        onPanUpdate: (DragUpdateDetails details) {
+          _heightScaleTemp += details.delta.dy;
 
-                if (_heightScaleTemp.abs() < _minHeight) {
-                  return;
-                }
+          if (_heightScaleTemp.abs() < _minHeight) {
+            return;
+          }
 
-                double dy = _position!.dy;
+          double dy = _position!.dy;
 
-                if (_heightScaleTemp > 0) {
-                  dy += _minHeight;
-                } else {
-                  dy -= _minHeight;
-                }
+          if (_heightScaleTemp > 0) {
+            dy += _minHeight;
+          } else {
+            dy -= _minHeight;
+          }
 
-                _heightScaleTemp = 0;
+          _heightScaleTemp = 0;
 
-                if (dy < 0) {
-                  dy = 0;
-                } else if (dy + _selectionHeight > widget.height) {
-                  dy = widget.height - _selectionHeight;
-                }
+          if (dy < 0) {
+            dy = 0;
+          } else if (dy + _selectionHeight > widget.height) {
+            dy = widget.height - _selectionHeight;
+          }
 
-                start = today?.add(
-                    _getDurationFromPositionSelection(widget.cellHeight, dy));
-                end = today?.add(_getDurationFromPositionSelection(
-                    widget.cellHeight, dy + _selectionHeight));
+          start = today
+              ?.add(_getDurationFromPositionSelection(widget.cellHeight, dy));
+          end = today?.add(_getDurationFromPositionSelection(
+              widget.cellHeight, dy + _selectionHeight));
 
-                setState(() {
-                  _position = Offset(_position!.dx, dy);
-                });
-              },
-        onPanEnd: _changeSize
-            ? null
-            : (DragEndDetails details) {
-                _heightScaleTemp = 0;
-                showTimeStart = false;
-                CalendarViewHelper.raiseCalendarDaySelectionChangedCallback(
-                    widget.calendar, start, end);
-                widget.dragSelectionHandle?.call(true);
-              },
+          setState(() {
+            _position = Offset(_position!.dx, dy);
+          });
+        },
+        onPanEnd: (DragEndDetails details) {
+          _heightScaleTemp = 0;
+          showTimeStart = false;
+          CalendarViewHelper.raiseCalendarDaySelectionChangedCallback(
+              widget.calendar, start, end);
+          widget.dragSelectionHandle?.call(true);
+        },
         child: Stack(
           children: <Widget>[
             Row(
@@ -218,16 +211,6 @@ class _DraggingSelectionState extends State<DraggingSelectionWidget> {
               bottom: 0,
               right: 0,
               child: GestureDetector(
-                onTapDown: (TapDownDetails details) {
-                  setState(() {
-                    _changeSize = true;
-                  });
-                },
-                onTapUp: (TapUpDetails details) {
-                  setState(() {
-                    _changeSize = false;
-                  });
-                },
                 onPanStart: (DragStartDetails details) {
                   showTimeEnd = true;
                 },
@@ -266,20 +249,23 @@ class _DraggingSelectionState extends State<DraggingSelectionWidget> {
                   showTimeEnd = false;
                   CalendarViewHelper.raiseCalendarDaySelectionChangedCallback(
                       widget.calendar, start, end);
-                  setState(() {
-                    _changeSize = false;
-                  });
                 },
                 child: SizedBox(
                   width: paddingBottom * 2,
                   height: paddingBottom * 2,
                   child: Center(
-                    child: Container(
-                      width: dragDotsSize,
-                      decoration: const BoxDecoration(
-                        color: Colors.brown,
-                        shape: BoxShape.circle,
-                      ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: <Widget>[
+                        Container(decoration: const BoxDecoration()),
+                        Container(
+                          width: dragDotsSize,
+                          decoration: const BoxDecoration(
+                            color: Colors.brown,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
