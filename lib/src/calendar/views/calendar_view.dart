@@ -5816,7 +5816,8 @@ class _CalendarViewState extends State<_CalendarView>
 
       if (widget.view == CalendarView.day) {
         if (widget.calendar.controller?.selectedDate !=
-            _calendarDaySelectDate) {
+                _calendarDaySelectDate &&
+            _calendarDaySelectDate != null) {
           reloadCalendarDaySelectionDate();
         }
       }
