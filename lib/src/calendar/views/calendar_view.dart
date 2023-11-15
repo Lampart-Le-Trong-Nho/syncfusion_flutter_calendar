@@ -5813,6 +5813,13 @@ class _CalendarViewState extends State<_CalendarView>
       if (isTimelineView) {
         _updateTimelineViews(oldWidget);
       }
+
+      if (widget.view == CalendarView.day) {
+        if (widget.calendar.controller?.selectedDate !=
+            _calendarDaySelectDate) {
+          reloadCalendarDaySelectionDate();
+        }
+      }
     }
 
     /// Update the scroll position with following scenarios
