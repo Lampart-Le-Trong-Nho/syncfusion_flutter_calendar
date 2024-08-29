@@ -11322,16 +11322,10 @@ class _AgendaDateTimePainter extends CustomPainter {
       TextStyle dateTextStyle,
       bool isToday,
       bool isMobile) {
-    //// Draw Weekday
-    final String dayTextFormat = scheduleViewSettings != null
-        ? scheduleViewSettings!.dayHeaderSettings.dayFormat
-        : 'EEE';
-    TextSpan span = TextSpan(
-        text: DateFormat(dayTextFormat, locale)
-            .format(selectedDate!)
-            .toUpperCase(),
+    TextSpan monthSpan = TextSpan(
+        text: DateFormat('M月', locale).format(selectedDate!).toUpperCase(),
         style: dayTextStyle);
-    _updateTextPainter(span);
+    _updateTextPainter(monthSpan);
 
     _textPainter.layout(maxWidth: size.width);
     _textPainter.paint(
@@ -11342,7 +11336,8 @@ class _AgendaDateTimePainter extends CustomPainter {
 
     final double weekDayHeight = padding + _textPainter.height;
     //// Draw Date
-    span = TextSpan(text: selectedDate!.day.toString(), style: dateTextStyle);
+    TextSpan span =
+        TextSpan(text: selectedDate!.day.toString(), style: dateTextStyle);
     _updateTextPainter(span);
 
     _textPainter.layout(maxWidth: size.width);
@@ -11351,9 +11346,9 @@ class _AgendaDateTimePainter extends CustomPainter {
     const int inBetweenPadding = 2;
     final double xPosition =
         padding + ((size.width - (2 * padding) - _textPainter.width) / 2);
-    double yPosition = weekDayHeight;
+    double yPosition = weekDayHeight + padding + inBetweenPadding;
+
     if (isToday) {
-      yPosition = weekDayHeight + padding + inBetweenPadding;
       _linePainter.color = todayHighlightColor!;
       _drawTodayCircle(canvas, xPosition, yPosition, padding);
     }
@@ -11382,6 +11377,23 @@ class _AgendaDateTimePainter extends CustomPainter {
     }
 
     _textPainter.paint(canvas, Offset(xPosition, yPosition));
+    //// Draw Weekday
+    final String dayTextFormat = scheduleViewSettings != null
+        ? scheduleViewSettings!.dayHeaderSettings.dayFormat
+        : '(EEE)';
+    span = TextSpan(
+        text: DateFormat(dayTextFormat, locale)
+            .format(selectedDate!)
+            .toUpperCase(),
+        style: dayTextStyle);
+    _updateTextPainter(span);
+
+    _textPainter.layout(maxWidth: size.width);
+    _textPainter.paint(
+        canvas,
+        Offset(
+            padding + ((size.width - (2 * padding) - _textPainter.width) / 2),
+            size.height - _textPainter.height));
   }
 
   void _addDayLabelForWeb(Canvas canvas, Size size, double padding,
