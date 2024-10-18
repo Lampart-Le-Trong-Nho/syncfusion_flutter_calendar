@@ -11357,7 +11357,7 @@ class _AgendaDateTimePainter extends CustomPainter {
 
     if (isToday) {
       _linePainter.color = todayHighlightColor!;
-      _drawTodayCircle(canvas, xPosition, yPosition, padding);
+      _drawTodayCircle(canvas, xPosition, yPosition, 0);
     }
 
     /// padding added between date and day labels in web, to avoid the
@@ -11379,7 +11379,7 @@ class _AgendaDateTimePainter extends CustomPainter {
                     ? Colors.white
                     : Colors.black87)
                 .withOpacity(0.04);
-        _drawTodayCircle(canvas, xPosition, yPosition, padding);
+        _drawTodayCircle(canvas, xPosition, yPosition, 0);
       }
     }
 
