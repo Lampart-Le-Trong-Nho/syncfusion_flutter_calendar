@@ -51,4 +51,19 @@ class LocalRembg {
       methodChannelResult,
     );
   }
+
+  static Future<LocalRembgResultModel> blurBackground(
+    Uint8List imageUint8List,
+  ) async {
+    Map<dynamic, dynamic> methodChannelResult = await _channel.invokeMethod(
+      'blurBackground',
+      {
+        'imageUint8List': imageUint8List,
+      },
+    );
+
+    return LocalRembgResultModel.fromMap(
+      methodChannelResult,
+    );
+  }
 }
