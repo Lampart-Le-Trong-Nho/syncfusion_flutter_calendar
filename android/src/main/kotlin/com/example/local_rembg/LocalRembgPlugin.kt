@@ -82,10 +82,6 @@ class LocalRembgPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             return
         }
 
-        val matrix: Matrix = Matrix()
-        matrix.postRotate(270f)
-        bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-
         processImage(bitmap, shouldCropImage, result)
     }
 
@@ -133,10 +129,6 @@ class LocalRembgPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 sendErrorResult(result, 0, "Failed to decode image file")
                 return
             }
-
-            val matrix: Matrix = Matrix()
-            matrix.postRotate(270f)
-            bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
 
             val inputImage = InputImage.fromBitmap(bitmap, 0)
             segmenter.process(inputImage)
