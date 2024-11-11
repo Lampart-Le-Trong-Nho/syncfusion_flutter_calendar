@@ -1,7 +1,5 @@
 # Local Background Remover (Android/IOS)
 
-<img src="https://i.ibb.co/xhtjGsD/Luminosity.png"/>
-
 ## Overview
 
 The Background Removal Library is a powerful tool designed to seamlessly remove backgrounds from
@@ -11,7 +9,7 @@ user experience and enabling a wide range of creative possibilities.
 
 ## System requirements
 
-- iOS: 15+
+- iOS: 12+
 - Android: 4.4+ (SDK 19)
 
 ## Features
@@ -44,7 +42,7 @@ Future<LocalRembgResultModel> removeBackground() async {
   LocalRembgResultModel localRembgResultModel = await LocalRembg.removeBackground(
      imagePath: // Your Image Path ,
      imageUint8List: // Your image Uint8List ,
-     cropTheImage: // Crop the segmented image (Default true) ,
+     cropTheImage: true,
   );
   return localRembgResultModel;
 }

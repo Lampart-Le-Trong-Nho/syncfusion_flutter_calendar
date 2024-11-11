@@ -9,13 +9,13 @@ Pod::Spec.new do |s|
   s.description      = <<-DESC
 A flutter plugin for remove background from image
                        DESC
-  s.homepage         = 'https://github.com/IIAmir/local_rembg'
+  s.homepage         = 'https://github.com/Lampart-Le-Trong-Nho/custom_library/tree/dev/local_rembg_custom'
   s.license          = { :file => '../LICENSE' }
-  s.author           = { 'Amirreza Alizadeh' => 'developer.iiamir@gmail.com' }
+  s.author           = { 'Lampart-Le-Trong-Nho' => 'trong_nho@lampart-vn.com' }
   s.source           = { :path => '.' }
   s.source_files = 'Classes/**/*'
   s.dependency 'Flutter'
-  s.platform = :ios, '15.0'
+  s.platform = :ios, '12.0'
 
   # Flutter.framework does not contain a i386 slice.
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386' }
