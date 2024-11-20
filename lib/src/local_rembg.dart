@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:local_rembg/src/image_type_extension.dart';
 import 'package:local_rembg/src/local_rembg_result_model.dart';
 
 class LocalRembg {
@@ -12,15 +11,10 @@ class LocalRembg {
   /// Returns a [LocalRembgResultModel] representing the result of the operation.
   /// [imagePath] Throws an error if the provided image path ['.png', '.jpg', '.jpeg', '.heic'] is invalid or unsupported.
   /// [imageUint8List] Your image Uint8List.
-  /// [cropTheImage] Specifies whether to crop the segmented image after removing the background.
-  /// If set to `true`, the segmented image will be cropped to remove any transparent or empty areas.
-  /// If set to `false`, the segmented image will be returned without any cropping.
   static Future<LocalRembgResultModel> removeBackground({
-    String? imagePath,
     Uint8List? imageUint8List,
-    bool? cropTheImage = false,
   }) async {
-    if (imagePath == null && imageUint8List == null) {
+    if (imageUint8List == null) {
       return LocalRembgResultModel(
         status: 0,
         imageBytes: [],
@@ -28,20 +22,10 @@ class LocalRembg {
       );
     }
 
-    if (imagePath != null && !imagePath.typeIsImage) {
-      return LocalRembgResultModel(
-        status: 0,
-        imageBytes: [],
-        errorMessage: 'Invalid image type!',
-      );
-    }
-
     Map<dynamic, dynamic> methodChannelResult = await _channel.invokeMethod(
       'removeBackground',
       {
-        'imagePath': imagePath,
         'imageUint8List': imageUint8List,
-        'cropImage': cropTheImage,
       },
     );
     if (kDebugMode) {
@@ -56,7 +40,7 @@ class LocalRembg {
     Uint8List imageUint8List,
   ) async {
     Map<dynamic, dynamic> methodChannelResult = await _channel.invokeMethod(
-      'blurBackground',
+      'blurredBackground',
       {
         'imageUint8List': imageUint8List,
       },

@@ -1,6 +1,5 @@
 package com.example.local_rembg
 
-import android.R.attr.rotation
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
@@ -18,10 +17,16 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import kotlinx.coroutines.*
 import java.io.ByteArrayOutputStream
-import java.io.File
 import java.nio.ByteBuffer
-import android.graphics.Matrix
 
+import android.renderscript.Allocation
+import android.renderscript.Element
+import android.renderscript.RenderScript
+import android.renderscript.ScriptIntrinsicBlur
+
+import android.os.Build
+import android.content.Context
+import com.google.android.renderscript.Toolkit
 
 class LocalRembgPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     private lateinit var channel: MethodChannel
@@ -29,10 +34,12 @@ class LocalRembgPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     private lateinit var segmenter: Segmenter
     private var width = 0
     private var height = 0
+    private var currentContext: Context? = null
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(binding.binaryMessenger, "methodChannel.localRembg")
         channel.setMethodCallHandler(this)
+        currentContext = binding.applicationContext
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -43,21 +50,25 @@ class LocalRembgPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
 
         when (call.method) {
             "removeBackground" -> {
-                val arguments = call.arguments as? Map<String, Any>
-                val imagePath = arguments?.get("imagePath") as? String
+                val arguments = call.arguments as? Map<*, *>
                 val imageUint8List = arguments?.get("imageUint8List") as? ByteArray
-                val shouldCropImage = arguments?.get("cropImage") as? Boolean ?: false
 
                 when {
-                    imagePath != null -> removeBackgroundFromFile(
-                        imagePath,
-                        shouldCropImage,
+                    imageUint8List != null -> removeBackgroundFromUint8List(
+                        imageUint8List,
                         result
                     )
 
-                    imageUint8List != null -> removeBackgroundFromUint8List(
+                    else -> sendErrorResult(result, 0, "Invalid arguments or unable to load image")
+                }
+            }
+            "blurredBackground" -> {
+                val arguments = call.arguments as? Map<*, *>
+                val imageUint8List = arguments?.get("imageUint8List") as? ByteArray
+
+                when {
+                    imageUint8List != null -> removeBlurredBackgroundFromUint8List(
                         imageUint8List,
-                        shouldCropImage,
                         result
                     )
 
@@ -73,21 +84,32 @@ class LocalRembgPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
 
     private fun removeBackgroundFromUint8List(
         imageUint8List: ByteArray,
-        shouldCropImage: Boolean,
         result: MethodChannel.Result
     ) {
-        var bitmap = BitmapFactory.decodeByteArray(imageUint8List, 0, imageUint8List.size)
+        val bitmap = BitmapFactory.decodeByteArray(imageUint8List, 0, imageUint8List.size)
         if (bitmap == null) {
             sendErrorResult(result, 0, "Failed to decode Uint8List image")
             return
         }
 
-        processImage(bitmap, shouldCropImage, result)
+        processImage(bitmap, result)
+    }
+
+    private fun removeBlurredBackgroundFromUint8List(
+        imageUint8List: ByteArray,
+        result: MethodChannel.Result
+    ) {
+        val bitmap = BitmapFactory.decodeByteArray(imageUint8List, 0, imageUint8List.size)
+        if (bitmap == null) {
+            sendErrorResult(result, 0, "Failed to decode Uint8List image")
+            return
+        }
+
+        processBlurredImage(bitmap, result)
     }
 
     private fun processImage(
         bitmap: Bitmap,
-        shouldCropImage: Boolean,
         result: MethodChannel.Result
     ) {
         val inputImage = InputImage.fromBitmap(bitmap, 0)
@@ -95,68 +117,33 @@ class LocalRembgPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             .addOnSuccessListener { segmentationMask ->
                 width = segmentationMask.width
                 height = segmentationMask.height
-                processSegmentationMask(result, bitmap, segmentationMask.buffer, shouldCropImage)
+                processSegmentationMask(result, bitmap, segmentationMask.buffer)
             }
             .addOnFailureListener { exception ->
                 sendErrorResult(result, 0, exception.message ?: "Segmentation failed")
             }
     }
 
-    private fun removeBackgroundFromFile(
-        imagePath: String,
-        shouldCropImage: Boolean,
+    private fun processBlurredImage(
+        bitmap: Bitmap,
         result: MethodChannel.Result
     ) {
-        if (imagePath.isEmpty()) {
-            sendErrorResult(result, 0, "Image path cannot be empty")
-            return
-        }
-
-        val file = File(imagePath)
-        if (!file.exists()) {
-            sendErrorResult(result, 0, "Image file not found")
-            return
-        }
-
-        try {
-            val options = BitmapFactory.Options().apply {
-                inPreferredConfig = Bitmap.Config.ARGB_8888
-                inSampleSize = 2
+        val inputImage = InputImage.fromBitmap(bitmap, 0)
+        segmenter.process(inputImage)
+            .addOnSuccessListener { segmentationMask ->
+                width = segmentationMask.width
+                height = segmentationMask.height
+                processBlurSegmentationMask(result, bitmap, segmentationMask.buffer)
             }
-
-            var bitmap = BitmapFactory.decodeFile(imagePath, options)
-            if (bitmap == null) {
-                sendErrorResult(result, 0, "Failed to decode image file")
-                return
+            .addOnFailureListener { exception ->
+                sendErrorResult(result, 0, exception.message ?: "Segmentation failed")
             }
-
-            val inputImage = InputImage.fromBitmap(bitmap, 0)
-            segmenter.process(inputImage)
-                .addOnSuccessListener { segmentationMask ->
-                    width = segmentationMask.width
-                    height = segmentationMask.height
-                    println("================width: " + width)
-                    println("================height: " + height)
-                    processSegmentationMask(
-                        result,
-                        bitmap,
-                        segmentationMask.buffer,
-                        shouldCropImage
-                    )
-                }
-                .addOnFailureListener { exception ->
-                    sendErrorResult(result, 0, exception.message ?: "Segmentation failed")
-                }
-        } catch (e: Exception) {
-            sendErrorResult(result, 0, e.message ?: "Error processing image file")
-        }
     }
 
     private fun processSegmentationMask(
         result: MethodChannel.Result,
         bitmap: Bitmap,
-        buffer: ByteBuffer,
-        shouldCropImage: Boolean
+        buffer: ByteBuffer
     ) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -169,16 +156,12 @@ class LocalRembgPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                     return@launch
                 }
 
-                val resultBmp: Bitmap? = if (shouldCropImage) {
-                    cropImage(newBmp, bgConf)
-                } else {
-                    makeBackgroundTransparent(newBmp, bgConf)
-                    newBmp
-                }
+                makeBackgroundTransparent(newBmp, bgConf)
+                val resultBmp: Bitmap = newBmp
 
                 val targetWidth = 1080
                 val targetHeight =
-                    (resultBmp!!.height.toFloat() / resultBmp.width.toFloat() * targetWidth).toInt()
+                    (resultBmp.height.toFloat() / resultBmp.width.toFloat() * targetWidth).toInt()
                 val resizedBmp =
                     Bitmap.createScaledBitmap(resultBmp, targetWidth, targetHeight, true)
 
@@ -211,38 +194,46 @@ class LocalRembgPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         }
     }
 
-    private fun cropImage(bitmap: Bitmap, bgConf: FloatArray): Bitmap? {
-        var minX = bitmap.width
-        var minY = bitmap.height
-        var maxX = 0
-        var maxY = 0
-        val pixels = IntArray(bitmap.width * bitmap.height)
-        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+    private fun processBlurSegmentationMask(
+        result: MethodChannel.Result,
+        bitmap: Bitmap,
+        buffer: ByteBuffer
+    ) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val bgConf = FloatArray(width * height)
+                buffer.rewind()
+                buffer.asFloatBuffer().get(bgConf)
 
-        for (y in 0 until height) {
-            for (x in 0 until width) {
-                val index = y * width + x
-                val conf = (1.0f - bgConf[index]) * 255
-                if (conf >= 100) {
-                    bitmap.setPixel(x, y, Color.TRANSPARENT)
-                } else {
-                    if (pixels[x + y * bitmap.width] != Color.TRANSPARENT) {
-                        minX = minOf(minX, x)
-                        minY = minOf(minY, y)
-                        maxX = maxOf(maxX, x)
-                        maxY = maxOf(maxY, y)
-                    }
+                val newBmp = bitmap.copy(bitmap.config, true) ?: run {
+                    sendErrorResult(result, 0, "Failed to copy bitmap")
+                    return@launch
                 }
+
+                val newBmp2 = bitmap.copy(bitmap.config, true) ?: run {
+                    sendErrorResult(result, 0, "Failed to copy bitmap")
+                    return@launch
+                }
+
+                val blurredBmp: Bitmap = Toolkit.blur(newBmp2, 25)
+                makeBackgroundBlurred(newBmp, blurredBmp, bgConf)
+                val resultBmp: Bitmap = newBmp
+
+                val outputStream = ByteArrayOutputStream()
+                resultBmp.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
+                val processedImageBytes = outputStream.toByteArray()
+
+                result.success(
+                    mapOf(
+                        "status" to 1,
+                        "imageBytes" to processedImageBytes.toList(),
+                        "message" to "Success"
+                    )
+                )
+            } catch (e: Exception) {
+                sendErrorResult(result, 0, e.message ?: "Error processing segmentation mask")
             }
         }
-
-        val cropWidth = maxX - minX + 1
-        val cropHeight = maxY - minY + 1
-        if (cropWidth <= 0 || cropHeight <= 0) {
-            return bitmap
-        }
-
-        return Bitmap.createBitmap(bitmap, minX, minY, cropWidth, cropHeight)
     }
 
     private fun makeBackgroundTransparent(bitmap: Bitmap, bgConf: FloatArray) {
@@ -255,6 +246,50 @@ class LocalRembgPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 }
             }
         }
+    }
+
+    private fun makeBackgroundBlurred(bitmap: Bitmap, blurredBmp: Bitmap, bgConf: FloatArray) {
+        for (y in 0 until bitmap.height) {
+            for (x in 0 until bitmap.width) {
+                val index = y * bitmap.width + x
+                val conf = (1.0f - bgConf[index]) * 255
+                if (conf >= 100) {
+                    bitmap.setPixel(x, y, blurredBmp.getPixel(x,y))
+                }
+            }
+        }
+    }
+
+    private fun blurBitmap(bitmap: Bitmap, radius: Float): Bitmap {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            return blurBitmapAPI31(bitmap, radius)
+        }
+
+        return blurBitmapBelowAPI31(bitmap, radius)
+    }
+
+    private fun blurBitmapAPI31(bitmap: Bitmap, radius: Float): Bitmap {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            return bitmap;
+        }
+
+        return Toolkit.blur(bitmap, radius.toInt())
+    }
+
+
+    private fun blurBitmapBelowAPI31(bitmap: Bitmap, radius: Float): Bitmap {
+        val renderScript = RenderScript.create(currentContext)
+        val input = Allocation.createFromBitmap(renderScript, bitmap)
+        val output = Allocation.createTyped(renderScript, input.type)
+        val scriptIntrinsicBlur = ScriptIntrinsicBlur.create(renderScript, Element.U8_4(renderScript))
+
+        scriptIntrinsicBlur.setRadius(radius)
+        scriptIntrinsicBlur.setInput(input)
+        scriptIntrinsicBlur.forEach(output)
+        output.copyTo(bitmap)
+
+        renderScript.destroy()
+        return bitmap
     }
 
     private fun sendErrorResult(result: MethodChannel.Result, status: Int, errorMessage: String?) {
