@@ -1,6 +1,7 @@
 import Flutter
 import UIKit
 import Vision
+import CoreImage
 
 @available(iOS 15.0, *)
 public class LocalRembgPlugin: NSObject, FlutterPlugin {
@@ -20,62 +21,113 @@ public class LocalRembgPlugin: NSObject, FlutterPlugin {
         segmentationRequest?.outputPixelFormat = kCVPixelFormatType_OneComponent8
         switch call.method {
         case "removeBackground":
-            if(isRunningOnSimulator()){
-                result(["status": 0, "message": "Please use a real device"])
-                return
-            }
-            guard let arguments = call.arguments as? [String: Any],
-                  let shouldCropImage = arguments["cropImage"] as? Bool else {
-                result(["status": 0, "message": "Invalid arguments"])
-                return
-            }
-            
-            var image: UIImage?
-            
-            if let imagePath = arguments["imagePath"] as? String {
-                image = UIImage(contentsOfFile: imagePath)
-            } else if let defaultImageUint8List = arguments["imageUint8List"] as? FlutterStandardTypedData {
-                image = UIImage(data: defaultImageUint8List.data)
-            }
-            
-            guard let loadedImage = image else {
-                result(["status": 0, "message": "Unable to load image"])
-                return
-            }
-            
-            applyFilter(image: loadedImage, shouldCropImage: shouldCropImage) { [self] resultImage, numFaces in
-                guard let resultImage = resultImage else {
-                    result(["status": 0, "message": "Unable to process image"])
-                    return
-                }
-                if let imageData = resultImage.pngData() {
-                    if numFaces >= 1 {
-                        result(["status": 1, "message": "Success", "imageBytes": FlutterStandardTypedData(bytes: imageData)])
-                    } else {
-                        if let removedBackgroundImage = removeBackground(image: loadedImage) {
-                            if let remBgImageData = removedBackgroundImage.pngData() {
-                                result(["status": 1, "message": "Success", "imageBytes": remBgImageData])
-                            }else{
-                                result(["status": 0, "message": "Unable to convert image to bytes"])
-                            }
-                            
-                        } else {
-                            result(["status": 0, "message": "Unable to remove background"])
-                        }
-                    }
-                } else {
-                    result(["status": 0, "message": "Unable to convert image to bytes"])
-                }
-            }
+            removedBackground(call: call, result: result)
+        case "blurredBackground":
+            blurredBackground(call: call, result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
     }
     
+    private func removedBackground(call: FlutterMethodCall, result: @escaping FlutterResult) -> Void {
+        if(isRunningOnSimulator()){
+            result(["status": 0, "message": "Please use a real device"])
+            return
+        }
+        guard let arguments = call.arguments as? [String: Any] else {
+            result(["status": 0, "message": "Invalid arguments"])
+            return
+        }
+        
+        var image: UIImage?
+        
+        if let defaultImageUint8List = arguments["imageUint8List"] as? FlutterStandardTypedData {
+            image = UIImage(data: defaultImageUint8List.data)
+        }
+        
+        guard let loadedImage = image else {
+            result(["status": 0, "message": "Unable to load image"])
+            return
+        }
+        
+        applyFilter(image: loadedImage) { [self] resultImage, numFaces in
+            guard let resultImage = resultImage else {
+                result(["status": 0, "message": "Unable to process image"])
+                return
+            }
+            if let imageData = resultImage.pngData() {
+                if numFaces >= 1 {
+                    result(["status": 1, "message": "Success", "imageBytes": FlutterStandardTypedData(bytes: imageData)])
+                } else {
+                    if let removedBackgroundImage = removeBackground(image: loadedImage) {
+                        if let remBgImageData = removedBackgroundImage.pngData() {
+                            result(["status": 1, "message": "Success", "imageBytes": remBgImageData])
+                        }else{
+                            result(["status": 0, "message": "Unable to convert image to bytes"])
+                        }
+                        
+                    } else {
+                        result(["status": 0, "message": "Unable to remove background"])
+                    }
+                }
+            } else {
+                result(["status": 0, "message": "Unable to convert image to bytes"])
+            }
+        }
+    }
+    
+    
+    private func blurredBackground(call: FlutterMethodCall, result: @escaping FlutterResult) -> Void {
+        if(isRunningOnSimulator()){
+            result(["status": 0, "message": "Please use a real device"])
+            return
+        }
+        guard let arguments = call.arguments as? [String: Any] else {
+            result(["status": 0, "message": "Invalid arguments"])
+            return
+        }
+        
+        var image: UIImage?
+        
+        if let imagePath = arguments["imagePath"] as? String {
+            image = UIImage(contentsOfFile: imagePath)
+        } else if let defaultImageUint8List = arguments["imageUint8List"] as? FlutterStandardTypedData {
+            image = UIImage(data: defaultImageUint8List.data)
+        }
+        
+        guard let loadedImage = image?.resized(to: CGSize(width: 1920, height: 2560)) else {
+            result(["status": 0, "message": "Unable to load image"])
+            return
+        }
+        
+        guard let blurredImage = blurImage(image: loadedImage, radius: 25) else {
+            result(["status": 0, "message": "Blurred failed"])
+            return
+        }
+        
+        applyFilter(image: loadedImage) { [self] resultImage, numFaces in
+            guard let resultImage = resultImage else {
+                result(["status": 0, "message": "Unable to process image"])
+                return
+            }
+
+            if let blurredBackgroundImage = overlayImage(backgroundImage: blurredImage, overlayImage: resultImage, at: CGPoint(x: 0, y: 0)) {
+                if let blurBgImageData = blurredBackgroundImage.jpegData(compressionQuality: 95) {
+                    result(["status": 1, "message": "Success", "imageBytes": blurBgImageData])
+                } else {
+                    result(["status": 0, "message": "Unable to convert image to bytes"])
+                }
+                
+            } else {
+                result(["status": 0, "message": "Unable to remove background"])
+            }
+        }
+    }
+    
     // This function applies a background mask to the given image using Core Image filters.
     // It composites the original image with the mask to produce an image with the background removed.
-    private func applyBackgroundMask(_ maskImage: CGImage?, image: UIImage, shouldCropImage: Bool, completion: @escaping (UIImage?, Int) -> Void) {
-        guard let maskImage = maskImage, let segmentationRequest = self.segmentationRequest else {
+    private func applyBackgroundMask(_ maskImage: CGImage?, image: UIImage, completion: @escaping (UIImage?, Int) -> Void) {
+        guard let maskImage = maskImage, let _ = self.segmentationRequest else {
             completion(nil, 0)
             return
         }
@@ -97,7 +149,7 @@ public class LocalRembgPlugin: NSObject, FlutterPlugin {
                 let context = CIContext()
                 if let cgImage = context.createCGImage(outputImage, from: outputImage.extent) {
                     let numFaces = self.countFaces(image: mainImage)
-                    let trimmedImage = shouldCropImage ? UIImage(cgImage: cgImage).trimmed() : UIImage(cgImage: cgImage)
+                    let trimmedImage = UIImage(cgImage: cgImage)
                     completion(trimmedImage, numFaces)
                 } else {
                     completion(nil, 0)
@@ -106,8 +158,8 @@ public class LocalRembgPlugin: NSObject, FlutterPlugin {
         }
     }
     
-    private func applyFilter(image: UIImage ,shouldCropImage: Bool, completion: @escaping (UIImage?, Int) -> Void) {
-        guard let originalCG = image.cgImage, let segmentationRequest = self.segmentationRequest else {
+    private func applyFilter(image: UIImage , completion: @escaping (UIImage?, Int) -> Void) {
+        guard let _ = image.cgImage, let segmentationRequest = self.segmentationRequest else {
             return completion(nil, 0)
         }
         let fixedImage = fixImageOrientation(image)
@@ -123,12 +175,25 @@ public class LocalRembgPlugin: NSObject, FlutterPlugin {
             
             let maskImage = CGImage.create(pixelBuffer: maskPixelBuffer)
             
-            return applyBackgroundMask(maskImage, image: fixedImage,shouldCropImage: shouldCropImage, completion: completion)
+            return applyBackgroundMask(maskImage, image: fixedImage, completion: completion)
         } catch {
             return completion(nil, 0)
         }
     }
-    
+
+    private func blurImage(image: UIImage, radius: CGFloat) -> UIImage? {
+        guard let ciImage = CIImage(image: image) else { return nil }
+        let filter = CIFilter(name: "CIGaussianBlur")
+        filter?.setValue(ciImage, forKey: kCIInputImageKey)
+        filter?.setValue(radius, forKey: kCIInputRadiusKey)
+        
+        guard let outputImage = filter?.outputImage else { return nil }
+        let context = CIContext(options: nil)
+        guard let cgImage = context.createCGImage(outputImage, from: ciImage.extent) else { return nil }
+        
+        return UIImage(cgImage: cgImage)
+    }
+
     private func fixImageOrientation(_ image: UIImage) -> UIImage {
         if image.imageOrientation == .up {
             return image
@@ -177,11 +242,25 @@ public class LocalRembgPlugin: NSObject, FlutterPlugin {
         }
         return nil
     }
+
     private func removeWhitePixels(image: CIImage) -> CIImage? {
         let chromaCIFilter = chromaKeyFilter()
         chromaCIFilter?.setValue(image, forKey: kCIInputImageKey)
         return chromaCIFilter?.outputImage
     }
+
+    private func overlayImage(backgroundImage: UIImage, overlayImage: UIImage, at point: CGPoint) -> UIImage? {
+        UIGraphicsBeginImageContextWithOptions(backgroundImage.size, false, 0.0)
+
+        backgroundImage.draw(in: CGRect(origin: CGPoint.zero, size: backgroundImage.size))
+        overlayImage.draw(in: CGRect(origin: point, size: overlayImage.size))
+
+        let newImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        
+        return newImage
+    }
+
     
     private func composite(image: CIImage, mask: CIImage) -> CIImage? {
         return CIFilter(name:"CISourceOutCompositing", parameters:
