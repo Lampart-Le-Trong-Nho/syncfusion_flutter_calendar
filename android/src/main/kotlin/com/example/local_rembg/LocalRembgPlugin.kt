@@ -26,7 +26,13 @@ import android.renderscript.ScriptIntrinsicBlur
 
 import android.os.Build
 import android.content.Context
-import com.google.android.renderscript.Toolkit
+import android.graphics.HardwareRenderer
+import android.graphics.PixelFormat
+import android.graphics.RenderEffect
+import android.graphics.RenderNode
+import android.graphics.Shader
+import android.hardware.HardwareBuffer
+import android.media.ImageReader
 
 class LocalRembgPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     private lateinit var channel: MethodChannel
@@ -34,6 +40,7 @@ class LocalRembgPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     private lateinit var segmenter: Segmenter
     private var width = 0
     private var height = 0
+    private var radius = 80f
     private var currentContext: Context? = null
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
@@ -62,6 +69,7 @@ class LocalRembgPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                     else -> sendErrorResult(result, 0, "Invalid arguments or unable to load image")
                 }
             }
+
             "blurredBackground" -> {
                 val arguments = call.arguments as? Map<*, *>
                 val imageUint8List = arguments?.get("imageUint8List") as? ByteArray
@@ -215,7 +223,7 @@ class LocalRembgPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                     return@launch
                 }
 
-                val blurredBmp: Bitmap = Toolkit.blur(newBmp2, 25)
+                val blurredBmp: Bitmap = blurBitmap(newBmp2, radius)
                 makeBackgroundBlurred(newBmp, blurredBmp, bgConf)
                 val resultBmp: Bitmap = newBmp
 
@@ -254,7 +262,7 @@ class LocalRembgPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 val index = y * bitmap.width + x
                 val conf = (1.0f - bgConf[index]) * 255
                 if (conf >= 100) {
-                    bitmap.setPixel(x, y, blurredBmp.getPixel(x,y))
+                    bitmap.setPixel(x, y, blurredBmp.getPixel(x, y))
                 }
             }
         }
@@ -273,15 +281,53 @@ class LocalRembgPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             return bitmap;
         }
 
-        return Toolkit.blur(bitmap, radius.toInt())
-    }
+        val imageReader = ImageReader.newInstance(
+            bitmap.width, bitmap.height,
+            PixelFormat.RGBA_8888, 1,
+            HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE or HardwareBuffer.USAGE_GPU_COLOR_OUTPUT
+        )
+        val renderNode = RenderNode("BlurEffect")
+        val hardwareRenderer = HardwareRenderer()
 
+        hardwareRenderer.setSurface(imageReader.surface)
+        hardwareRenderer.setContentRoot(renderNode)
+        renderNode.setPosition(0, 0, imageReader.width, imageReader.height)
+
+        val blurRenderEffect = RenderEffect.createBlurEffect(
+            radius, radius,
+            Shader.TileMode.MIRROR
+        )
+
+        renderNode.setRenderEffect(blurRenderEffect)
+
+        val renderCanvas = renderNode.beginRecording()
+
+        renderCanvas.drawBitmap(bitmap, 0f, 0f, null)
+        renderNode.endRecording()
+        hardwareRenderer.createRenderRequest()
+            .setWaitForPresent(true)
+            .syncAndDraw()
+
+        val image = imageReader.acquireNextImage() ?: throw RuntimeException("No Image")
+        val hardwareBuffer = image.hardwareBuffer ?: throw RuntimeException("No HardwareBuffer")
+        val newBmp = Bitmap.wrapHardwareBuffer(hardwareBuffer, null)
+            ?: throw RuntimeException("Create Bitmap Failed")
+
+        hardwareBuffer.close()
+        image.close()
+        imageReader.close()
+        renderNode.discardDisplayList()
+        hardwareRenderer.destroy()
+
+        return newBmp.copy(Bitmap.Config.RGBA_F16, true)
+    }
 
     private fun blurBitmapBelowAPI31(bitmap: Bitmap, radius: Float): Bitmap {
         val renderScript = RenderScript.create(currentContext)
         val input = Allocation.createFromBitmap(renderScript, bitmap)
         val output = Allocation.createTyped(renderScript, input.type)
-        val scriptIntrinsicBlur = ScriptIntrinsicBlur.create(renderScript, Element.U8_4(renderScript))
+        val scriptIntrinsicBlur =
+            ScriptIntrinsicBlur.create(renderScript, Element.U8_4(renderScript))
 
         scriptIntrinsicBlur.setRadius(radius)
         scriptIntrinsicBlur.setInput(input)

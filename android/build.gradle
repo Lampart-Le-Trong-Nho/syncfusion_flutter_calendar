@@ -57,7 +57,6 @@ android {
 
         implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.1'
         implementation "com.google.mlkit:segmentation-selfie:16.0.0-beta5"
-        implementation project(":renderscript-toolkit")
 //        implementation files('D:/DevTools/flutter/bin/cache/artifacts/engine/android-arm64-release/flutter.jar')
     }
 

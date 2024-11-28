@@ -36,9 +36,7 @@ class LocalRembg {
     );
   }
 
-  static Future<LocalRembgResultModel> blurBackground(
-    Uint8List imageUint8List,
-  ) async {
+  static Future<LocalRembgResultModel> blurBackground(Uint8List imageUint8List) async {
     Map<dynamic, dynamic> methodChannelResult = await _channel.invokeMethod(
       'blurredBackground',
       {

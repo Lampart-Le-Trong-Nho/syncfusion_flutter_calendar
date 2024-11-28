@@ -8,13 +8,14 @@ public class LocalRembgPlugin: NSObject, FlutterPlugin {
     
     private var segmentationRequest: VNGeneratePersonSegmentationRequest?
     let model = DeepLabV3()
-    
+    let radius = CGFloat(80)
+
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "methodChannel.localRembg", binaryMessenger: registrar.messenger())
         let instance = LocalRembgPlugin()
         registrar.addMethodCallDelegate(instance, channel: channel)
     }
-    
+
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         segmentationRequest = VNGeneratePersonSegmentationRequest()
         segmentationRequest?.qualityLevel = .accurate
@@ -28,7 +29,7 @@ public class LocalRembgPlugin: NSObject, FlutterPlugin {
             result(FlutterMethodNotImplemented)
         }
     }
-    
+
     private func removedBackground(call: FlutterMethodCall, result: @escaping FlutterResult) -> Void {
         if(isRunningOnSimulator()){
             result(["status": 0, "message": "Please use a real device"])
@@ -38,18 +39,18 @@ public class LocalRembgPlugin: NSObject, FlutterPlugin {
             result(["status": 0, "message": "Invalid arguments"])
             return
         }
-        
+
         var image: UIImage?
-        
+
         if let defaultImageUint8List = arguments["imageUint8List"] as? FlutterStandardTypedData {
             image = UIImage(data: defaultImageUint8List.data)
         }
-        
+
         guard let loadedImage = image else {
             result(["status": 0, "message": "Unable to load image"])
             return
         }
-        
+
         applyFilter(image: loadedImage) { [self] resultImage, numFaces in
             guard let resultImage = resultImage else {
                 result(["status": 0, "message": "Unable to process image"])
@@ -65,7 +66,7 @@ public class LocalRembgPlugin: NSObject, FlutterPlugin {
                         }else{
                             result(["status": 0, "message": "Unable to convert image to bytes"])
                         }
-                        
+
                     } else {
                         result(["status": 0, "message": "Unable to remove background"])
                     }
@@ -75,8 +76,7 @@ public class LocalRembgPlugin: NSObject, FlutterPlugin {
             }
         }
     }
-    
-    
+
     private func blurredBackground(call: FlutterMethodCall, result: @escaping FlutterResult) -> Void {
         if(isRunningOnSimulator()){
             result(["status": 0, "message": "Please use a real device"])
@@ -86,25 +86,23 @@ public class LocalRembgPlugin: NSObject, FlutterPlugin {
             result(["status": 0, "message": "Invalid arguments"])
             return
         }
-        
+
         var image: UIImage?
-        
-        if let imagePath = arguments["imagePath"] as? String {
-            image = UIImage(contentsOfFile: imagePath)
-        } else if let defaultImageUint8List = arguments["imageUint8List"] as? FlutterStandardTypedData {
+
+        if let defaultImageUint8List = arguments["imageUint8List"] as? FlutterStandardTypedData {
             image = UIImage(data: defaultImageUint8List.data)
         }
-        
-        guard let loadedImage = image?.resized(to: CGSize(width: 1920, height: 2560)) else {
+
+        guard let loadedImage = image?.resized(to: CGSize(width: 1080, height: 1920)) else {
             result(["status": 0, "message": "Unable to load image"])
             return
         }
-        
-        guard let blurredImage = blurImage(image: loadedImage, radius: 25) else {
+
+        guard let blurredImage = blurImage(image: loadedImage, radius: radius) else {
             result(["status": 0, "message": "Blurred failed"])
             return
         }
-        
+
         applyFilter(image: loadedImage) { [self] resultImage, numFaces in
             guard let resultImage = resultImage else {
                 result(["status": 0, "message": "Unable to process image"])
@@ -112,7 +110,7 @@ public class LocalRembgPlugin: NSObject, FlutterPlugin {
             }
 
             if let blurredBackgroundImage = overlayImage(backgroundImage: blurredImage, overlayImage: resultImage, at: CGPoint(x: 0, y: 0)) {
-                if let blurBgImageData = blurredBackgroundImage.jpegData(compressionQuality: 95) {
+                if let blurBgImageData = blurredBackgroundImage.resized(to: image!.size).jpegData(compressionQuality: 100) {
                     result(["status": 1, "message": "Success", "imageBytes": blurBgImageData])
                 } else {
                     result(["status": 0, "message": "Unable to convert image to bytes"])
