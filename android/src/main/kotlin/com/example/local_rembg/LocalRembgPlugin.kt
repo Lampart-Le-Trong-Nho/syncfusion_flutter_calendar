@@ -273,7 +273,7 @@ class LocalRembgPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             return blurBitmapAPI31(bitmap, radius)
         }
 
-        return blurBitmapBelowAPI31(bitmap, radius)
+        return blurBitmapBelowAPI31(bitmap, 25f)
     }
 
     private fun blurBitmapAPI31(bitmap: Bitmap, radius: Float): Bitmap {
@@ -328,13 +328,8 @@ class LocalRembgPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         val output = Allocation.createTyped(renderScript, input.type)
         val scriptIntrinsicBlur =
             ScriptIntrinsicBlur.create(renderScript, Element.U8_4(renderScript))
-        var blurRadius = radius
 
-        if(radius > 25f) {
-            blurRadius = 25f
-        }
-
-        scriptIntrinsicBlur.setRadius(blurRadius)
+        scriptIntrinsicBlur.setRadius(radius)
         scriptIntrinsicBlur.setInput(input)
         scriptIntrinsicBlur.forEach(output)
         output.copyTo(bitmap)
