@@ -328,8 +328,13 @@ class LocalRembgPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         val output = Allocation.createTyped(renderScript, input.type)
         val scriptIntrinsicBlur =
             ScriptIntrinsicBlur.create(renderScript, Element.U8_4(renderScript))
+        var blurRadius = radius
 
-        scriptIntrinsicBlur.setRadius(radius)
+        if(radius > 25f) {
+            blurRadius = 25f
+        }
+
+        scriptIntrinsicBlur.setRadius(blurRadius)
         scriptIntrinsicBlur.setInput(input)
         scriptIntrinsicBlur.forEach(output)
         output.copyTo(bitmap)
