@@ -1,0 +1,88 @@
+group 'me.carda.awesome_notifications_fcm'
+version '0.8.0'
+
+buildscript {
+    ext.kotlin_version = '1.7.10'
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.3.0'
+    }
+}
+
+rootProject.allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
+    }
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    if (project.android.hasProperty('namespace')) {
+        namespace 'me.carda.awesome_notifications_fcm'
+    }
+    compileSdkVersion 34
+
+    defaultConfig {
+        minSdkVersion 21
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+def awesomeCoreProject = findProject(':awesome_notifications')
+if (awesomeCoreProject == null) {
+    throw new GradleException('Could not find the awesome_notifications plugin, have you added it as a dependency in your pubspec?')
+}
+
+def firebaseCoreProject = findProject(':firebase_core')
+if (firebaseCoreProject == null) {
+    throw new GradleException('Could not find the firebase_core FlutterFire plugin, have you added it as a dependency in your pubspec?')
+} else if (!firebaseCoreProject.properties['FirebaseSDKVersion']) {
+    throw new GradleException('A newer version of the firebase_core FlutterFire plugin is required, please update your firebase_core pubspec dependency.')
+}
+
+def getRootProjectExtOrCoreProperty(name, firebaseCoreProject) {
+    if (!rootProject.ext.has('FlutterFire')) return firebaseCoreProject.properties[name]
+    if (!rootProject.ext.get('FlutterFire')[name]) return firebaseCoreProject.properties[name]
+    return rootProject.ext.get('FlutterFire').get(name)
+}
+
+dependencies {
+//    implementation project(':awn_core')
+    implementation 'me.carda:AndroidAwnCore:[0.8.0, 0.9.0)'
+//    implementation project(':awn_fcm_core')
+    implementation 'me.carda:AndroidAwnFcmCore:[0.8.0, 0.9.0)'
+
+    compileOnly project(':awesome_notifications')
+
+    implementation 'com.google.android.gms:play-services-base:18.2.0'
+
+    implementation 'com.google.code.gson:gson:2.9.0'
+    implementation 'com.google.guava:guava:31.1-android'
+
+    api firebaseCoreProject
+    implementation platform("com.google.firebase:firebase-bom:${getRootProjectExtOrCoreProperty("FirebaseSDKVersion", firebaseCoreProject)}")
+    implementation 'com.google.firebase:firebase-messaging'//:23.0.1
+    implementation 'com.google.firebase:firebase-crashlytics'
+
+    // Required for instrumented tests
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'androidx.arch.core:core-testing:2.2.0'
+    testImplementation 'org.mockito:mockito-core:5.1.1'
+    testImplementation 'org.mockito:mockito-inline:5.0.0'
+
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test:runner:1.5.2'
+    androidTestImplementation 'androidx.test:core:1.5.0'
+    androidTestImplementation 'com.android.support.test:runner:1.0.2'
+}
