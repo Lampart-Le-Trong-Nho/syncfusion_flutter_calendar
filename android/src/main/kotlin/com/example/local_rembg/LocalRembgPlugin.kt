@@ -167,7 +167,7 @@ class LocalRembgPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 makeBackgroundTransparent(newBmp, bgConf)
                 val resultBmp: Bitmap = newBmp
 
-                val targetWidth = 1080
+                val targetWidth = bitmap.width
                 val targetHeight =
                     (resultBmp.height.toFloat() / resultBmp.width.toFloat() * targetWidth).toInt()
                 val resizedBmp =
